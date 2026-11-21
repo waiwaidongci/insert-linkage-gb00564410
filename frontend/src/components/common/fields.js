@@ -6,10 +6,12 @@ export function field(config, current = config.default) {
   const options = config.type === 'bool' ? [['true', '是'], ['false', '否']]
     : config.options?.map(option => [String(option), String(option)]);
   const type = {int:'number', number:'number', date:'date', string:'text'}[config.type] || config.type;
-  const input = options
-    ? el('select', attrs, options.map(([value, label]) => el('option', {value, selected:value === String(current)}, label)))
-    : el('input', {...attrs, type, step:config.type === 'int' ? '1' : config.type === 'number' ? 'any' : undefined,
-      min: config.min, max:config.max, maxlength:config.max_length, value:current, autocomplete:config.autocomplete});
+  const input = config.type === 'text'
+    ? el('textarea', {...attrs, rows: config.rows || 4, maxlength: config.max_length}, current ?? '')
+    : options
+      ? el('select', attrs, options.map(([value, label]) => el('option', {value, selected:value === String(current)}, label)))
+      : el('input', {...attrs, type, step:config.type === 'int' ? '1' : config.type === 'number' ? 'any' : undefined,
+        min: config.min, max:config.max, maxlength:config.max_length, value:current, autocomplete:config.autocomplete});
   return el('label', {for:id, class:'field'}, el('span', {}, config.label), input,
     config.help && el('small', {id:`${id}-help`}, config.help));
 }

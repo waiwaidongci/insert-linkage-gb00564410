@@ -29,7 +29,7 @@ def cell(field, raw):
         elif kind == 'bool':
             values = {'true': True, 'false': False, '1': True, '0': False, '是': True, '否': False}
             value = values[str(value).lower()]
-        elif kind in {'select', 'string'}:
+        elif kind in {'select', 'string', 'text'}:
             if not isinstance(value, str) or len(value) > field.get('max_length', 300):
                 raise ValueError
             if kind == 'select' and value not in field['options']:
@@ -76,4 +76,11 @@ def normalize_params(params):
     fields = SPEC['params']
     if set(params) - {field['key'] for field in fields}:
         raise ValueError('存在未知运行参数，请重新打开工作面板')
-    return {field['key']: cell(field, params.get(field['key'], field['default'])) for field in fields}
+    normalized = {}
+    for field in fields:
+        raw = params.get(field['key'], field['default'])
+        if field.get('required', True) is False and raw in (None, ''):
+            normalized[field['key']] = None if field['type'] != 'text' else ''
+        else:
+            normalized[field['key']] = cell(field, raw)
+    return normalized

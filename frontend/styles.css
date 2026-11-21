@@ -107,6 +107,12 @@ textarea { resize:vertical; }
 .decision { margin-top:.8rem; padding-left:.7rem; border-left:3px solid var(--accent); }
 .schedule-fields { border-top:1px solid var(--line); padding-top:.65rem; }
 .schedule-fields > :not(summary) { margin-top:.7rem; }
+.merge-toggle { display:grid; gap:.4rem; padding-top:.2rem; border-top:1px dashed var(--line); }
+.merge-fields { border:1px solid var(--line); padding:.9rem; display:grid; gap:.7rem; min-width:0; }
+.merge-fields[hidden] { display:none; }
+.merge-fields legend { font-weight:720; padding:0 .4rem; }
+.merge-fields textarea { min-height:7rem; font-family:inherit; }
+.pill[data-state="merge"] { border-color:var(--accent); background:var(--accent); color:var(--panel); }
 body[data-page="results"] .main > div > .panel { margin-top:1rem; }
 .login { display:grid; grid-template-columns:1.65fr minmax(300px,1fr); min-height:100svh; }
 .login-intro { padding:clamp(1.75rem,8.7vw,10rem) clamp(1.75rem,6.9vw,7.4rem); background:var(--nav); color:var(--nav-ink); align-content:center; }

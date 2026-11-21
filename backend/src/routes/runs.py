@@ -6,6 +6,7 @@ from src.config.database import connection
 from src.config.settings import ARTIFACTS
 from src.constants.enums import Review, Role, Status
 from src.controllers.auth import allow, current
+from src.domain.merge import validate_basis
 from src.domain.spec import SPEC
 from src.models.identity import User
 from src.models.jobs import Run
@@ -36,10 +37,24 @@ def create(body: RunRequest, db: Session = Depends(connection),
            actor: User = Depends(allow(Role.ADMIN, Role.ANALYST))):
     if not db.get(Dataset, body.dataset_id):
         raise HTTPException(404, '找不到指定的数据批次')
-    item = Run(name=body.name, dataset_id=body.dataset_id, params=normalize_params(body.params), author=actor.username)
+    params = normalize_params(body.params)
+    merge_id = params.get('merge_dataset_id')
+    if merge_id:
+        if merge_id == body.dataset_id:
+            raise ValueError('并入的新批须与签核底账批次不同，请选择另一个批次。')
+        if not db.get(Dataset, merge_id):
+            raise HTTPException(404, '找不到并入的新批数据批次')
+        if not (params.get('signed_groups') or '').strip():
+            raise ValueError('两厂归并须填写已签核分组，固定旧组编号与原成员。')
+        # 提前做一次依据校验，把口径错误挡在入队之前，不产生无效运行。
+        validate_basis(db.get(Dataset, body.dataset_id).rows,
+                       db.get(Dataset, merge_id).rows,
+                       params['signed_groups'], params)
+    item = Run(name=body.name, dataset_id=body.dataset_id, params=params, author=actor.username)
     db.add(item)
     db.flush()
-    record(db, actor.username, 'analysis.queued', item.id, dataset_id=item.dataset_id)
+    record(db, actor.username, 'analysis.queued', item.id, dataset_id=item.dataset_id,
+           merge_dataset_id=merge_id)
     db.commit()
     wake()
     return views.run(item, detail=True)

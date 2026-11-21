@@ -7,11 +7,23 @@ from src.domain.analysis import analyze
 from src.domain.spec import SPEC
 from src.models.jobs import Delivery, Run, Schedule
 from src.models.source import Dataset
+from src.services import merge_service
 from src.services.audit import record
 from src.utils.exports import write_report
 from src.utils.time import now
 
 log = logging.getLogger(__name__)
+
+
+class _FrozenDataset:
+    """租约内冻结的批次快照，提供归并服务所需的只读属性。"""
+
+    def __init__(self, snapshot):
+        self.id = snapshot["id"]
+        self.name = snapshot["name"]
+        self.rows = snapshot["rows"]
+        self.row_count = snapshot["row_count"]
+        self.checksum = snapshot["checksum"]
 
 
 def materialize_due():
@@ -57,15 +69,38 @@ def claim():
         job.status = Status.RUNNING
         job.attempt += 1
         job.lease_until = stamp + timedelta(minutes=3)
-        records = db.get(Dataset, job.dataset_id).rows
-        return job.id, job.attempt, records, job.params
+        primary = db.get(Dataset, job.dataset_id)
+        payload = {"kind": "cluster", "rows": primary.rows, "params": job.params}
+        merge_id = job.params.get("merge_dataset_id")
+        if merge_id:
+            merge_dataset = db.get(Dataset, merge_id)
+            if merge_dataset is None:
+                job.status = Status.FAILED
+                job.error = "并入的新批数据批次不存在，请重新选择后再运行"
+                job.finished_at = stamp
+                record(db, 'worker', 'analysis.failed', job.id, reason=job.error)
+                return None
+            # 冻结两批依据：快照行与指纹随租约带出，重试始终复用同一份依据。
+            payload = {
+                "kind": "merge", "params": job.params,
+                "old": {"id": primary.id, "name": primary.name, "rows": primary.rows,
+                        "row_count": primary.row_count, "checksum": primary.checksum},
+                "new": {"id": merge_dataset.id, "name": merge_dataset.name, "rows": merge_dataset.rows,
+                        "row_count": merge_dataset.row_count, "checksum": merge_dataset.checksum},
+            }
+        return job.id, job.attempt, payload
 
 
 def execute(lease):
-    job_id, attempt, rows, params = lease
+    job_id, attempt, payload = lease
     result = export = failure = None
     try:
-        result = analyze(rows, params)
+        if payload["kind"] == "merge":
+            result = merge_service.build_result(
+                _FrozenDataset(payload["old"]), _FrozenDataset(payload["new"]), payload["params"]
+            )
+        else:
+            result = analyze(payload["rows"], payload["params"])
         export = write_report(job_id, attempt, result)
     except ValueError as error:
         failure = str(error)[:500]

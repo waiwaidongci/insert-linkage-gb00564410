@@ -12,9 +12,25 @@ _INSERTS = (
     ("CP-C02", "密封件入库内衬", "300×200 箱座|八格分隔|标签卡位"),
 )
 
+# 第二工厂的新批打样规格，编号与旧批互斥，合并时冻结为独立批次。
+_MERGE_INSERTS = (
+    ("CP-A04", "二厂减速箱盖内衬", "600×400 箱座|四角缓冲|双销定位|防静电接触层"),
+    ("CP-B04", "二厂轴套清洗内衬", "400×300 箱座|弧面底托|左侧定位孔|纵向加强筋"),
+    ("CP-D01", "二厂异形阀体内衬", "250×250 箱座|弧面底托|顶部让位|防静电接触层"),
+    ("CP-D02", "二厂异形泵体内衬", "250×250 箱座|弧面底托|侧面让位|防静电接触层"),
+    ("CP-D03", "二厂异形电机内衬", "250×250 箱座|弧面底托|端部让位|防静电接触层"),
+)
+
 
 def demo_rows() -> list[dict]:
     return [
         {"spec_id": spec_id, "name": name, "fit_traits": traits}
         for spec_id, name, traits in _INSERTS
+    ]
+
+
+def merge_rows() -> list[dict]:
+    return [
+        {"spec_id": spec_id, "name": name, "fit_traits": traits}
+        for spec_id, name, traits in _MERGE_INSERTS
     ]
